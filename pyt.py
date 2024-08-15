@@ -38,8 +38,10 @@ def findPhoneNumbersCommand(update: Update, context):
 
 def findPhoneNumbers (update: Update, context):
     user_input = update.message.text # Получаем текст, содержащий(или нет) номера телефонов
-    update.message.reply_text(find_phone.find_numbers(user_input))
-    return ConversationHandler.END
+    context.user_data['phone'] = find_phone.find_numbers(user_input)
+    update.message.reply_text(context.user_data['phone'])
+    update.message.reply_text('Введите yes, если требуется сохранить в базу, введите not, если нет')
+    return 'writePhoneNumbers' 
 
 
 def findEmailsCommand(update: Update, context):
@@ -49,8 +51,10 @@ def findEmailsCommand(update: Update, context):
 
 def findEmails(update: Update, context):
     user_input = update.message.text
-    update.message.reply_text(find_email.find_emails(user_input))
-    return ConversationHandler.END
+    context.user_data['email'] = find_email.find_emails(user_input) 
+    update.message.reply_text(context.user_data['phone'])
+    update.message.reply_text('Введите yes, если требуется сохранить в базу, введите not, если нет')
+    return 'writeEmails'
 
 
 def verifyPasswordCommand(update: Update, context):
@@ -162,6 +166,8 @@ def main():
         entry_points=[CommandHandler('find_phone_number', findPhoneNumbersCommand)],
         states={
             'findPhoneNumbers': [MessageHandler(Filters.text & ~Filters.command, findPhoneNumbers)],
+            'writePhoneNumbers': [MessageHandler(Filters.regex('^yes$'), writePhoneInDB),
+                                  MessageHandler(Filters.regex('.*'), End)],
         },
         fallbacks=[]
     )
@@ -170,6 +176,8 @@ def main():
         entry_points=[CommandHandler('find_email', findEmailsCommand)],
         states={
             'findEmails': [MessageHandler(Filters.text & ~Filters.command, findEmails)],
+            'writeEmails': [MessageHandler(Filters.regex('^yes$'), writeEmailsInDB),
+                       MessageHandler(Filters.regex('.*'), End)],
         },
         fallbacks=[]
     )
