@@ -2,6 +2,7 @@ import linux_check
 import check_pass
 import find_email
 import find_phone
+import work_with_db
 import logging
 import math
 import os
@@ -36,12 +37,20 @@ def findPhoneNumbersCommand(update: Update, context):
     return 'findPhoneNumbers'
 
 
-def findPhoneNumbers (update: Update, context):
+def findPhoneNumbers(update: Update, context):
     user_input = update.message.text # Получаем текст, содержащий(или нет) номера телефонов
     context.user_data['phone'] = find_phone.find_numbers(user_input)
     update.message.reply_text(context.user_data['phone'])
-    update.message.reply_text('Введите yes, если требуется сохранить в базу, введите not, если нет')
-    return 'writePhoneNumbers' 
+    if context.user_data['phone'] == 'No phone numbers in text':
+        return ConversationHandler.END
+    else:
+        update.message.reply_text('Введите yes, если требуется сохранить в базу, введите not, если нет')
+        return 'writePhoneNumbers'
+
+
+def writePhoneInDB(update: Update, context):
+    reply = work_with_db.insert_in_phonenumbers(context.user_data['phone'])
+    update.message.reply_text(reply)
 
 
 def findEmailsCommand(update: Update, context):
@@ -51,11 +60,18 @@ def findEmailsCommand(update: Update, context):
 
 def findEmails(update: Update, context):
     user_input = update.message.text
-    context.user_data['email'] = find_email.find_emails(user_input) 
-    update.message.reply_text(context.user_data['phone'])
-    update.message.reply_text('Введите yes, если требуется сохранить в базу, введите not, если нет')
-    return 'writeEmails'
+    context.user_data['email'] = find_email.find_emails(user_input)
+    update.message.reply_text(context.user_data['email'])
+    if context.user_data['email'] == 'No emails in text':
+        return ConversationHandler.END
+    else:
+        update.message.reply_text('Введите yes, если требуется сохранить в базу, введите not, если нет')
+        return 'writeEmails'
 
+
+def writeEmailsInDB(update: Update, context):
+    reply = work_with_db.insert_in_emails(context.user_data['email'])
+    update.message.reply_text(reply)
 
 def verifyPasswordCommand(update: Update, context):
     update.message.reply_text('Введите пароль для проверки сложности: ')
@@ -141,9 +157,9 @@ def allAptList(update: Update, context):
     list_apt = linux_check.get_information_from_commands('apt list --installed | cut -d "/" -f 1')
     if len(list_apt) > 4100:
         for i in range(math.ceil(len(list_apt) / 4100)):
-            mes = list_apt[i * 4100: (i + 1) * 4100]    
+            mes = list_apt[i * 4100: (i + 1) * 4100]
             update.message.reply_text(mes)
-    else: 
+    else:
         update.message.reply_text(list_apt)
     return ConversationHandler.END
 
@@ -154,6 +170,24 @@ def AptPacket(update: Update, context):
     update.message.reply_text(apt_packet)
     return ConversationHandler.END
 
+
+def repl_logs(update: Update, context):
+    res = linux_check.get_information_from_commands('cat /var/log/postgresql/postgresql-14-main.log | grep -i repl | tail -10')
+    update.message.reply_text(res)
+
+
+def get_emails(update: Update, context):
+    res = work_with_db.select_in_emails()
+    update.message.reply_text(res)
+
+
+def get_phone_numbers(update: Update, context):
+    res = work_with_db.select_in_phonenumbers()
+    update.message.reply_text(res)
+
+
+def cancel(update: Update, context):
+    return ConversationHandler.END
 
 
 def main():
@@ -167,7 +201,7 @@ def main():
         states={
             'findPhoneNumbers': [MessageHandler(Filters.text & ~Filters.command, findPhoneNumbers)],
             'writePhoneNumbers': [MessageHandler(Filters.regex('^yes$'), writePhoneInDB),
-                                  MessageHandler(Filters.regex('.*'), End)],
+                                  MessageHandler(Filters.regex('.*'), cancel)],
         },
         fallbacks=[]
     )
@@ -177,7 +211,7 @@ def main():
         states={
             'findEmails': [MessageHandler(Filters.text & ~Filters.command, findEmails)],
             'writeEmails': [MessageHandler(Filters.regex('^yes$'), writeEmailsInDB),
-                       MessageHandler(Filters.regex('.*'), End)],
+                       MessageHandler(Filters.regex('.*'), cancel)],
         },
         fallbacks=[]
     )
@@ -218,6 +252,9 @@ def main():
     dp.add_handler(CommandHandler("get_ps", process))
     dp.add_handler(CommandHandler("get_ss", socketstats))
     dp.add_handler(CommandHandler("get_services", services))
+    dp.add_handler(CommandHandler("get_repl_logs", repl_logs))
+    dp.add_handler(CommandHandler("get_emails", get_emails))
+    dp.add_handler(CommandHandler("get_phone_numbers", get_phone_numbers))
 
     # Запускаем бота
     updater.start_polling()
@@ -228,4 +265,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
